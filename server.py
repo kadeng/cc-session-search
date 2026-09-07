@@ -111,7 +111,7 @@ async def list_tools() -> list[types.Tool]:
                 "type": "object",
                 "properties": {
                     "date": {"type": "string", "description": "Target date in YYYY-MM-DD format"},
-                    "style": {"type": "string", "description": "Summary style: 'journal' (daily recap), 'insights' (learning focus), 'stories' (narrative focus)", "default": "journal"},
+                    "style": {"type": "string", "description": "Summary style: 'journal' or 'worklog' (what each session did, which files and commands it touched, what it left open), 'insights' or 'decisions' (decisions with their reasons, measurements, discovered tool behaviour), 'stories' or 'debugging' (one entry per debugging episode: symptom, cause, fix)", "default": "journal"},
                     "project_filter": {"type": "string", "description": "Optional filter to specific project"}
                 },
                 "required": ["date"]
@@ -125,7 +125,7 @@ async def list_tools() -> list[types.Tool]:
                 "properties": {
                     "start_time": {"type": "string", "description": "Start time in ISO format (e.g., '2025-09-13T12:00:00')"},
                     "end_time": {"type": "string", "description": "End time in ISO format (e.g., '2025-09-13T16:00:00')"},
-                    "style": {"type": "string", "description": "Summary style: 'journal' (daily recap), 'insights' (learning focus), 'stories' (narrative focus)", "default": "journal"},
+                    "style": {"type": "string", "description": "Summary style: 'journal' or 'worklog' (what each session did, which files and commands it touched, what it left open), 'insights' or 'decisions' (decisions with their reasons, measurements, discovered tool behaviour), 'stories' or 'debugging' (one entry per debugging episode: symptom, cause, fix)", "default": "journal"},
                     "project_filter": {"type": "string", "description": "Optional filter to specific project"}
                 },
                 "required": ["start_time", "end_time"]

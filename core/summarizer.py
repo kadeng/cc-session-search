@@ -2,6 +2,7 @@
 Conversation summarization using headless Claude
 """
 import json
+import os
 import subprocess
 import tempfile
 from datetime import datetime
@@ -164,44 +165,61 @@ class ConversationSummarizer:
     def _call_headless_claude(self, conversation_content: str, style: str, date: str) -> Dict[str, Any]:
         """Call headless Claude to generate summary"""
 
-        # Style-specific prompts
+        # The rules every style shares. The reader of one of these summaries is
+        # a software engineer resuming or searching past Claude Code work, so a
+        # summary is only useful if it names the files, commands and errors
+        # involved rather than describing the work in general terms.
+        common_rules = (
+            "Write plain sentences. Do not use marketing language and do not "
+            "praise the work. Keep every identifier exactly as it appears in "
+            "the transcript: file paths, function and class names, commands, "
+            "flags, environment variables, error text, branch names and commit "
+            "hashes. Do not invent anything, and do not guess at an outcome the "
+            "transcript does not state; say that the transcript does not say. "
+            "Leave a list empty rather than filling it with plausible entries."
+        )
+
+        # Style-specific prompts, written for software engineering sessions.
         prompts = {
-            "journal": f"""Analyze today's conversations ({date}) and create a concise daily recap suitable for a personal journal.
+            "journal": f"""Summarise the Claude Code sessions from {date} as a work log for the engineer who ran them.
 
-Focus on:
-- Key accomplishments and activities discussed
-- Important decisions or insights
-- People mentioned and interactions
-- Projects worked on or discussed
-- Notable experiences or stories
-- Learning moments or realizations
+Cover, in this order:
+- What each session was asked to do, and whether it finished, stalled, or was abandoned.
+- The files, functions, commands and identifiers that were touched.
+- The errors and test failures that came up, and how each was resolved or why it was not.
+- What was left open, and the next step it needs.
 
-Format as a natural daily summary that captures the essence of the day's conversations.""",
+{common_rules}""",
 
-            "insights": f"""Analyze today's conversations ({date}) and extract key insights and learning moments.
+            "insights": f"""Summarise the Claude Code sessions from {date} as the decisions and findings worth keeping.
 
-Focus on:
-- Technical insights or breakthroughs
-- Problem-solving approaches
-- New understanding or realizations
-- Patterns in thinking or work
-- Lessons learned
-- Knowledge gaps identified
+Cover, in this order:
+- Each decision taken, the reason given for it, and the alternative it rejected.
+- Facts established by running something: measurements, timings, counts, versions, and the command that produced each.
+- Behaviour of a library, tool or interface that was discovered by probing rather than read from its documentation.
+- Mistakes made and what they cost, so that the same one is not repeated.
 
-Format as actionable insights for knowledge base enhancement.""",
+{common_rules}""",
 
-            "stories": f"""Analyze today's conversations ({date}) and identify compelling stories or experiences worth capturing.
+            "stories": f"""Summarise the Claude Code sessions from {date} as the debugging episodes worth recalling.
 
-Focus on:
-- Personal experiences and anecdotes
-- Interesting problem-solving journeys
-- Memorable interactions or conversations
-- Creative or innovative moments
-- Challenges overcome
-- Serendipitous discoveries
+For each episode, state:
+- The symptom as it first appeared, including the exact error text or the wrong output.
+- What was ruled out on the way, and how it was ruled out.
+- The actual cause.
+- The change that fixed it, named by file and by function.
+- Whether a test or a check now covers it.
 
-Format as narrative summaries of the most story-worthy moments."""
+Report only episodes the transcript actually contains. {common_rules}"""
         }
+
+        # Aliases, so that a caller can name the coding-oriented style directly
+        # without knowing which of the original three keys carries it.
+        style = {
+            "worklog": "journal",
+            "decisions": "insights",
+            "debugging": "stories",
+        }.get(style, style)
 
         prompt = prompts.get(style, prompts["journal"])
 
@@ -214,33 +232,40 @@ Format as narrative summaries of the most story-worthy moments."""
             # Call headless Claude
             claude_prompt = f"""{prompt}
 
-Please analyze the conversation content and provide a structured summary.
-
-Return your response in this JSON format:
+Return only a JSON object, with no text before or after it, in exactly this format:
 {{
-    "summary": "Main summary text here",
-    "key_topics": ["topic1", "topic2", "topic3"],
-    "insights": ["insight1", "insight2"],
-    "stories": ["story1", "story2"],
-    "projects_mentioned": ["project1", "project2"],
-    "people_mentioned": ["person1", "person2"]
+    "summary": "The prose summary described above.",
+    "key_topics": ["a short phrase naming a subject the sessions worked on"],
+    "insights": ["one decision, measurement or discovered behaviour, with its reason"],
+    "stories": ["one debugging episode: the symptom, the cause, and the fix"],
+    "projects_mentioned": ["a repository, project or directory the work happened in"],
+    "people_mentioned": ["a person named in the sessions; empty when none were"]
 }}
 
-Conversation content to analyze:
+Every list holds plain strings. Leave a list empty when the sessions give it
+nothing to hold.
+
+Session content to summarise:
 {conversation_content[:5000]}...
 """
 
-            result = subprocess.run([
-                'claude', '--print', '--output-format', 'text',
-                '--model', 'claude-3-5-sonnet-latest',
-                claude_prompt
-            ],
-            capture_output=True,
-            text=True
+            # The model is whatever the `claude` command is configured to use,
+            # unless CC_SESSION_SEARCH_MODEL names one. Pinning a model here
+            # breaks the tool whenever that model identifier is retired, which
+            # is what happened to the `claude-3-5-sonnet-latest` this replaced.
+            command = ['claude', '--print', '--output-format', 'text']
+            model = os.environ.get('CC_SESSION_SEARCH_MODEL', '').strip()
+            if model:
+                command += ['--model', model]
+            command.append(claude_prompt)
+
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True
             )
 
             # Clean up temp file
-            import os
             os.unlink(temp_file_path)
 
             if result.returncode == 0:

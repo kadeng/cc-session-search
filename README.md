@@ -10,7 +10,7 @@ An MCP (Model Context Protocol) server that provides tools for searching and ana
 - **Analyze Sessions**: Extract and analyze messages with role filtering
 - **Search Conversations**: Search for specific terms with context windows and time ranges
 - **Get Message Details**: Retrieve full content for specific messages
-- **Summarize Conversations**: AI-powered summarization of daily conversations
+- **Summarize Conversations**: summaries of a day or a time range, written for an engineer resuming past work
 
 ## Installation
 
@@ -63,6 +63,34 @@ Searches conversations for specific terms with context windows.
 
 ### get_message_details(session_id, message_indices)
 Retrieves full content for specific messages by session ID and indices.
+
+### summarize_daily_conversations(date, style="journal", project_filter=None)
+### summarize_time_range(start_time, end_time, style="journal", project_filter=None)
+
+Both shell out to the `claude` command in headless mode and return a JSON
+object with the fields `summary`, `key_topics`, `insights`, `stories`,
+`projects_mentioned` and `people_mentioned`.
+
+The summarization prompts are written for software engineering sessions rather
+than for a personal journal. They ask for the files, functions, commands and
+identifiers a session touched, kept verbatim; the decisions taken and the
+reasons given for them; the errors met and how each was resolved; what was left
+open; and any measurement, with the command that produced it. They tell the
+model to write plain sentences, to invent nothing, and to leave a list empty
+rather than fill it with plausible entries.
+
+Three styles, each with a plainer alias:
+
+| Style | Alias | What it asks for |
+|---|---|---|
+| `journal` | `worklog` | What each session did, what it touched, what it left open |
+| `insights` | `decisions` | Decisions with their reasons, measurements, discovered tool behaviour |
+| `stories` | `debugging` | One entry per debugging episode: symptom, cause, fix |
+
+Set `CC_SESSION_SEARCH_MODEL` to choose the model these calls use. When it is
+unset the `claude` command's own configured model is used. Nothing here pins a
+model identifier, because a pinned identifier breaks the tool once that model
+is retired.
 
 ## Development
 
