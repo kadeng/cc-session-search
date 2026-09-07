@@ -11,6 +11,10 @@ from typing import Dict, Any, List, Optional
 from core.models import ConversationSummary
 from core.searcher import SessionSearcher
 
+# The model used to summarize sessions, overridable with the
+# CC_SESSION_SEARCH_MODEL environment variable.
+DEFAULT_MODEL = 'claude-sonnet-5'
+
 
 class ConversationSummarizer:
     """Handles intelligent summarization of daily conversations"""
@@ -249,15 +253,18 @@ Session content to summarise:
 {conversation_content[:5000]}...
 """
 
-            # The model is whatever the `claude` command is configured to use,
-            # unless CC_SESSION_SEARCH_MODEL names one. Pinning a model here
-            # breaks the tool whenever that model identifier is retired, which
-            # is what happened to the `claude-3-5-sonnet-latest` this replaced.
-            command = ['claude', '--print', '--output-format', 'text']
-            model = os.environ.get('CC_SESSION_SEARCH_MODEL', '').strip()
-            if model:
-                command += ['--model', model]
-            command.append(claude_prompt)
+            # Claude Sonnet 5 is the summarization model. This is not an
+            # Anthropic API call: the model identifier is handed to the
+            # `claude` command in headless mode, which resolves it against
+            # whatever credentials that command already holds.
+            # CC_SESSION_SEARCH_MODEL overrides it, which is also the escape
+            # hatch for the day this identifier is retired.
+            model = os.environ.get('CC_SESSION_SEARCH_MODEL', '').strip() or DEFAULT_MODEL
+            command = [
+                'claude', '--print', '--output-format', 'text',
+                '--model', model,
+                claude_prompt,
+            ]
 
             result = subprocess.run(
                 command,

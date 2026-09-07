@@ -87,10 +87,18 @@ Three styles, each with a plainer alias:
 | `insights` | `decisions` | Decisions with their reasons, measurements, discovered tool behaviour |
 | `stories` | `debugging` | One entry per debugging episode: symptom, cause, fix |
 
-Set `CC_SESSION_SEARCH_MODEL` to choose the model these calls use. When it is
-unset the `claude` command's own configured model is used. Nothing here pins a
-model identifier, because a pinned identifier breaks the tool once that model
-is retired.
+The summarization model is **Claude Sonnet 5** (`claude-sonnet-5`). The default
+lives in one place, `DEFAULT_MODEL` in `core/summarizer.py`, and
+`CC_SESSION_SEARCH_MODEL` overrides it:
+
+```bash
+CC_SESSION_SEARCH_MODEL=claude-opus-5 uv run python server.py
+```
+
+These summaries are not Anthropic API calls. The model identifier is passed as
+`--model` to the `claude` command running in headless mode, so it resolves
+against whatever credentials that command already holds; no API key is read
+here.
 
 ## Development
 
